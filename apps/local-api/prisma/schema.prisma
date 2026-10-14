@@ -1,0 +1,1002 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+  DISABLED
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
+
+enum BatchStatus {
+  AVAILABLE
+  QUARANTINE
+  BLOCKED
+  EXPIRED
+  DEPLETED
+  RECALLED
+}
+
+enum InventoryMovementType {
+  RECEIPT
+  SALE
+  RETURN_IN
+  RETURN_TO_SUPPLIER
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  DAMAGE
+  LOSS
+  EXPIRATION
+  QUARANTINE
+  RELEASE
+  RECALL
+}
+
+enum ExpiryAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  MIXED
+  CREDIT
+}
+
+enum PortfolioStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum InventoryTransferStatus {
+  DRAFT
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+enum InventoryCountStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  APPLIED
+  CANCELLED
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum LicenseKind {
+  SUBSCRIPTION
+  PERPETUAL
+}
+
+enum LicenseStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ElectronicDocumentType {
+  INVOICE
+  POS_EQUIVALENT
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum ElectronicDocumentStatus {
+  PENDING
+  PROCESSING
+  ACCEPTED
+  REJECTED
+  FAILED
+  CANCELLED
+}
+
+model Establishment {
+  id                  String               @id @default(uuid()) @db.Uuid
+  legalName           String               @map("legal_name")
+  tradeName           String               @map("trade_name")
+  taxId               String               @unique @map("tax_id")
+  timezone            String               @default("America/Bogota")
+  currency            String               @default("COP")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  branches            Branch[]
+  users               User[]
+  auditLogs           AuditLog[]
+  productCategories   ProductCategory[]
+  laboratories        Laboratory[]
+  suppliers           Supplier[]
+  products            Product[]
+  inventoryMovements  InventoryMovement[]
+  expiryAlertRules    ExpiryAlertRule[]
+  expiryAlerts        ExpiryAlert[]
+  customers           Customer[]
+  cashSessions        CashSession[]
+  sales               Sale[]
+  purchaseOrders      PurchaseOrder[]
+  transfers           InventoryTransfer[]
+  inventoryCounts     InventoryCount[]
+  saleReturns         SaleReturn[]
+  accounts            Account[]
+  journalEntries      JournalEntry[]
+  receivables         AccountReceivable[]
+  payables            AccountPayable[]
+  receivablePayments  ReceivablePayment[]
+  payablePayments     PayablePayment[]
+  licenses            CommercialLicense[]
+  electronicDocuments ElectronicDocument[]
+
+  @@map("establishments")
+}
+
+model CommercialLicense {
+  id              String        @id @default(uuid()) @db.Uuid
+  establishmentId String        @map("establishment_id") @db.Uuid
+  kind            LicenseKind
+  status          LicenseStatus @default(ACTIVE)
+  licenseId       String        @unique @map("license_id")
+  customerName    String        @map("customer_name")
+  tokenDigest     String        @unique @map("token_digest")
+  signedToken     String        @map("signed_token")
+  issuedAt        DateTime      @map("issued_at") @db.Timestamptz(3)
+  expiresAt       DateTime?     @map("expires_at") @db.Timestamptz(3)
+  maxBranches     Int           @default(1) @map("max_branches")
+  maxUsers        Int           @default(3) @map("max_users")
+  features        Json
+  activatedAt     DateTime      @default(now()) @map("activated_at") @db.Timestamptz(3)
+  revokedAt       DateTime?     @map("revoked_at") @db.Timestamptz(3)
+  establishment   Establishment @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+
+  @@index([establishmentId, status, expiresAt])
+  @@map("commercial_licenses")
+}
+
+model ElectronicDocument {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  establishmentId    String                   @map("establishment_id") @db.Uuid
+  saleId             String?                  @unique @map("sale_id") @db.Uuid
+  type               ElectronicDocumentType
+  status             ElectronicDocumentStatus @default(PENDING)
+  provider           String
+  idempotencyKey     String                   @map("idempotency_key")
+  providerDocumentId String?                  @map("provider_document_id")
+  cufe               String?                  @unique
+  requestPayload     Json?                    @map("request_payload")
+  responsePayload    Json?                    @map("response_payload")
+  xmlUrl             String?                  @map("xml_url")
+  pdfUrl             String?                  @map("pdf_url")
+  errorMessage       String?                  @map("error_message")
+  attempts           Int                      @default(0)
+  issuedAt           DateTime?                @map("issued_at") @db.Timestamptz(3)
+  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  establishment      Establishment            @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  sale               Sale?                    @relation(fields: [saleId], references: [id], onDelete: Restrict)
+
+  @@unique([establishmentId, idempotencyKey])
+  @@index([establishmentId, status, createdAt])
+  @@map("electronic_documents")
+}
+
+model Branch {
+  id                String              @id @default(uuid()) @db.Uuid
+  establishmentId   String              @map("establishment_id") @db.Uuid
+  code              String
+  name              String
+  active            Boolean             @default(true)
+  establishment     Establishment       @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  terminals         Terminal[]
+  inventory         BranchInventory[]
+  locations         WarehouseLocation[]
+  batches           InventoryBatch[]
+  movements         InventoryMovement[]
+  expiryAlerts      ExpiryAlert[]
+  cashSessions      CashSession[]
+  sales             Sale[]
+  purchaseOrders    PurchaseOrder[]
+  outgoingTransfers InventoryTransfer[] @relation("TransferOrigin")
+  incomingTransfers InventoryTransfer[] @relation("TransferDestination")
+  inventoryCounts   InventoryCount[]
+
+  @@unique([establishmentId, code])
+  @@index([establishmentId, active])
+  @@map("branches")
+}
+
+model Terminal {
+  id          String  @id @default(uuid()) @db.Uuid
+  branchId    String  @map("branch_id") @db.Uuid
+  code        String
+  name        String
+  fingerprint String? @unique
+  active      Boolean @default(true)
+  branch      Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([branchId, code])
+  @@map("terminals")
+}
+
+model User {
+  id                      String              @id @default(uuid()) @db.Uuid
+  establishmentId         String              @map("establishment_id") @db.Uuid
+  email                   String
+  displayName             String              @map("display_name")
+  passwordHash            String              @map("password_hash")
+  status                  UserStatus          @default(ACTIVE)
+  failedLoginCount        Int                 @default(0) @map("failed_login_count")
+  lockedUntil             DateTime?           @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt             DateTime?           @map("last_login_at") @db.Timestamptz(3)
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  establishment           Establishment       @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  roles                   UserRole[]
+  refreshSessions         RefreshSession[]
+  auditLogs               AuditLog[]
+  inventoryMovements      InventoryMovement[]
+  resolvedExpiryAlerts    ExpiryAlert[]       @relation("ExpiryAlertResolver")
+  cashSessionsOpened      CashSession[]       @relation("CashSessionOpenedBy")
+  cashSessionsClosed      CashSession[]       @relation("CashSessionClosedBy")
+  sales                   Sale[]
+  voidedSales             Sale[]              @relation("SaleVoidedBy")
+  purchaseOrdersCreated   PurchaseOrder[]     @relation("PurchaseOrderCreatedBy")
+  purchaseOrdersApproved  PurchaseOrder[]     @relation("PurchaseOrderApprovedBy")
+  transfersCreated        InventoryTransfer[] @relation("TransferCreatedBy")
+  transfersShipped        InventoryTransfer[] @relation("TransferShippedBy")
+  transfersReceived       InventoryTransfer[] @relation("TransferReceivedBy")
+  inventoryCountsCreated  InventoryCount[]    @relation("InventoryCountCreatedBy")
+  inventoryCountsApproved InventoryCount[]    @relation("InventoryCountApprovedBy")
+  inventoryCountsApplied  InventoryCount[]    @relation("InventoryCountAppliedBy")
+  saleReturns             SaleReturn[]
+  journalEntriesCreated   JournalEntry[]      @relation("JournalEntryCreatedBy")
+
+  @@unique([establishmentId, email])
+  @@index([establishmentId, status])
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  name        String
+  system      Boolean          @default(true)
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  description String
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model RefreshSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("refresh_sessions")
+}
+
+model AuditLog {
+  id              BigInt        @id @default(autoincrement())
+  establishmentId String        @map("establishment_id") @db.Uuid
+  userId          String?       @map("user_id") @db.Uuid
+  action          String
+  entityType      String        @map("entity_type")
+  entityId        String?       @map("entity_id")
+  outcome         AuditOutcome
+  reason          String?
+  ipAddress       String?       @map("ip_address")
+  metadata        Json?
+  occurredAt      DateTime      @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  establishment   Establishment @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([establishmentId, occurredAt(sort: Desc)])
+  @@index([userId, occurredAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model ProductCategory {
+  id                     String        @id @default(uuid()) @db.Uuid
+  establishmentId        String        @map("establishment_id") @db.Uuid
+  code                   String
+  name                   String
+  active                 Boolean       @default(true)
+  defaultExpiryAlertDays Int[]         @default([30, 60, 90, 180]) @map("default_expiry_alert_days")
+  establishment          Establishment @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  products               Product[]
+
+  @@unique([establishmentId, code])
+  @@index([establishmentId, active])
+  @@map("product_categories")
+}
+
+model Laboratory {
+  id              String        @id @default(uuid()) @db.Uuid
+  establishmentId String        @map("establishment_id") @db.Uuid
+  name            String
+  taxId           String?       @map("tax_id")
+  active          Boolean       @default(true)
+  establishment   Establishment @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  products        Product[]
+
+  @@unique([establishmentId, name])
+  @@map("laboratories")
+}
+
+model Supplier {
+  id              String           @id @default(uuid()) @db.Uuid
+  establishmentId String           @map("establishment_id") @db.Uuid
+  taxId           String           @map("tax_id")
+  legalName       String           @map("legal_name")
+  tradeName       String?          @map("trade_name")
+  phone           String?
+  email           String?
+  active          Boolean          @default(true)
+  establishment   Establishment    @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  batches         InventoryBatch[]
+  purchaseOrders  PurchaseOrder[]
+  payables        AccountPayable[]
+
+  @@unique([establishmentId, taxId])
+  @@index([establishmentId, active])
+  @@map("suppliers")
+}
+
+model Product {
+  id                            String                  @id @default(uuid()) @db.Uuid
+  establishmentId               String                  @map("establishment_id") @db.Uuid
+  categoryId                    String                  @map("category_id") @db.Uuid
+  laboratoryId                  String?                 @map("laboratory_id") @db.Uuid
+  internalCode                  String                  @map("internal_code")
+  barcode                       String?
+  commercialName                String                  @map("commercial_name")
+  genericName                   String?                 @map("generic_name")
+  activeIngredient              String?                 @map("active_ingredient")
+  concentration                 String?
+  presentation                  String
+  manufacturer                  String?
+  sanitaryRegistration          String?                 @map("sanitary_registration")
+  sanitaryRegistrationExpiresAt DateTime?               @map("sanitary_registration_expires_at") @db.Date
+  purchaseUnit                  String                  @default("UNIDAD") @map("purchase_unit")
+  saleUnit                      String                  @default("UNIDAD") @map("sale_unit")
+  unitsPerPurchase              Decimal                 @default(1) @map("units_per_purchase") @db.Decimal(18, 6)
+  salePrice                     Decimal                 @map("sale_price") @db.Decimal(18, 2)
+  taxRate                       Decimal                 @default(0) @map("tax_rate") @db.Decimal(7, 4)
+  minimumStock                  Decimal                 @default(0) @map("minimum_stock") @db.Decimal(18, 6)
+  maximumStock                  Decimal?                @map("maximum_stock") @db.Decimal(18, 6)
+  storageConditions             String?                 @map("storage_conditions")
+  physicalLocationHint          String?                 @map("physical_location_hint")
+  prescriptionRequired          Boolean                 @default(false) @map("prescription_required")
+  controlledSubstance           Boolean                 @default(false) @map("controlled_substance")
+  status                        ProductStatus           @default(ACTIVE)
+  createdAt                     DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                     DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  establishment                 Establishment           @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  category                      ProductCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  laboratory                    Laboratory?             @relation(fields: [laboratoryId], references: [id], onDelete: SetNull)
+  branchInventory               BranchInventory[]
+  batches                       InventoryBatch[]
+  movements                     InventoryMovement[]
+  saleItems                     SaleItem[]
+  purchaseItems                 PurchaseOrderItem[]
+  transferItems                 InventoryTransferItem[]
+
+  @@unique([establishmentId, internalCode])
+  @@unique([establishmentId, barcode])
+  @@index([establishmentId, commercialName])
+  @@index([establishmentId, activeIngredient])
+  @@map("products")
+}
+
+model BranchInventory {
+  branchId     String   @map("branch_id") @db.Uuid
+  productId    String   @map("product_id") @db.Uuid
+  onHand       Decimal  @default(0) @map("on_hand") @db.Decimal(18, 6)
+  reserved     Decimal  @default(0) @db.Decimal(18, 6)
+  minimumStock Decimal? @map("minimum_stock") @db.Decimal(18, 6)
+  maximumStock Decimal? @map("maximum_stock") @db.Decimal(18, 6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  branch       Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([branchId, productId])
+  @@index([branchId, onHand])
+  @@map("branch_inventory")
+}
+
+model WarehouseLocation {
+  id       String           @id @default(uuid()) @db.Uuid
+  branchId String           @map("branch_id") @db.Uuid
+  code     String
+  name     String
+  active   Boolean          @default(true)
+  branch   Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  batches  InventoryBatch[]
+
+  @@unique([branchId, code])
+  @@map("warehouse_locations")
+}
+
+model InventoryBatch {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  branchId              String                  @map("branch_id") @db.Uuid
+  productId             String                  @map("product_id") @db.Uuid
+  supplierId            String?                 @map("supplier_id") @db.Uuid
+  locationId            String?                 @map("location_id") @db.Uuid
+  lotNumber             String                  @map("lot_number")
+  expiresAt             DateTime                @map("expires_at") @db.Date
+  receivedAt            DateTime                @default(now()) @map("received_at") @db.Timestamptz(3)
+  unitCost              Decimal                 @map("unit_cost") @db.Decimal(18, 6)
+  quantity              Decimal                 @db.Decimal(18, 6)
+  reserved              Decimal                 @default(0) @db.Decimal(18, 6)
+  status                BatchStatus             @default(AVAILABLE)
+  branch                Branch                  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product               Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  supplier              Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  location              WarehouseLocation?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  movements             InventoryMovement[]
+  expiryAlerts          ExpiryAlert[]
+  saleAllocations       SaleItemAllocation[]
+  outboundTransferItems InventoryTransferItem[]
+  inventoryCountItems   InventoryCountItem[]
+
+  @@unique([branchId, productId, lotNumber])
+  @@index([branchId, productId, status, expiresAt])
+  @@index([expiresAt, status])
+  @@map("inventory_batches")
+}
+
+model InventoryMovement {
+  id              BigInt                @id @default(autoincrement())
+  establishmentId String                @map("establishment_id") @db.Uuid
+  branchId        String                @map("branch_id") @db.Uuid
+  productId       String                @map("product_id") @db.Uuid
+  batchId         String?               @map("batch_id") @db.Uuid
+  userId          String                @map("user_id") @db.Uuid
+  type            InventoryMovementType
+  quantity        Decimal               @db.Decimal(18, 6)
+  unitCost        Decimal?              @map("unit_cost") @db.Decimal(18, 6)
+  balanceAfter    Decimal               @map("balance_after") @db.Decimal(18, 6)
+  reason          String
+  referenceType   String?               @map("reference_type")
+  referenceId     String?               @map("reference_id")
+  idempotencyKey  String                @map("idempotency_key")
+  occurredAt      DateTime              @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  establishment   Establishment         @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  branch          Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  product         Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch           InventoryBatch?       @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([establishmentId, idempotencyKey])
+  @@index([branchId, productId, occurredAt(sort: Desc)])
+  @@index([batchId, occurredAt(sort: Desc)])
+  @@map("inventory_movements")
+}
+
+model ExpiryAlertRule {
+  id              String        @id @default(uuid()) @db.Uuid
+  establishmentId String        @map("establishment_id") @db.Uuid
+  daysBefore      Int           @map("days_before")
+  active          Boolean       @default(true)
+  establishment   Establishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+
+  @@unique([establishmentId, daysBefore])
+  @@map("expiry_alert_rules")
+}
+
+model ExpiryAlert {
+  id              String            @id @default(uuid()) @db.Uuid
+  establishmentId String            @map("establishment_id") @db.Uuid
+  branchId        String            @map("branch_id") @db.Uuid
+  batchId         String            @map("batch_id") @db.Uuid
+  thresholdDays   Int               @map("threshold_days")
+  status          ExpiryAlertStatus @default(OPEN)
+  detectedAt      DateTime          @default(now()) @map("detected_at") @db.Timestamptz(3)
+  resolvedAt      DateTime?         @map("resolved_at") @db.Timestamptz(3)
+  resolvedById    String?           @map("resolved_by_id") @db.Uuid
+  resolutionNotes String?           @map("resolution_notes")
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  branch          Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  batch           InventoryBatch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  resolvedBy      User?             @relation("ExpiryAlertResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, thresholdDays])
+  @@index([establishmentId, status, detectedAt(sort: Desc)])
+  @@map("expiry_alerts")
+}
+
+model Customer {
+  id              String              @id @default(uuid()) @db.Uuid
+  establishmentId String              @map("establishment_id") @db.Uuid
+  documentType    String              @default("CC") @map("document_type")
+  documentNumber  String              @map("document_number")
+  name            String
+  phone           String?
+  email           String?
+  active          Boolean             @default(true)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  establishment   Establishment       @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  sales           Sale[]
+  receivables     AccountReceivable[]
+
+  @@unique([establishmentId, documentNumber])
+  @@index([establishmentId, name])
+  @@map("customers")
+}
+
+model CashSession {
+  id              String            @id @default(uuid()) @db.Uuid
+  establishmentId String            @map("establishment_id") @db.Uuid
+  branchId        String            @map("branch_id") @db.Uuid
+  openedById      String            @map("opened_by_id") @db.Uuid
+  closedById      String?           @map("closed_by_id") @db.Uuid
+  openingAmount   Decimal           @map("opening_amount") @db.Decimal(18, 2)
+  closingAmount   Decimal?          @map("closing_amount") @db.Decimal(18, 2)
+  expectedAmount  Decimal?          @map("expected_amount") @db.Decimal(18, 2)
+  status          CashSessionStatus @default(OPEN)
+  openedAt        DateTime          @default(now()) @map("opened_at") @db.Timestamptz(3)
+  closedAt        DateTime?         @map("closed_at") @db.Timestamptz(3)
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  branch          Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  openedBy        User              @relation("CashSessionOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  closedBy        User?             @relation("CashSessionClosedBy", fields: [closedById], references: [id], onDelete: Restrict)
+  sales           Sale[]
+
+  @@index([establishmentId, branchId, status])
+  @@map("cash_sessions")
+}
+
+model Sale {
+  id                 String              @id @default(uuid()) @db.Uuid
+  establishmentId    String              @map("establishment_id") @db.Uuid
+  branchId           String              @map("branch_id") @db.Uuid
+  cashSessionId      String              @map("cash_session_id") @db.Uuid
+  userId             String              @map("user_id") @db.Uuid
+  customerId         String?             @map("customer_id") @db.Uuid
+  number             BigInt              @default(autoincrement())
+  status             SaleStatus          @default(COMPLETED)
+  paymentMethod      PaymentMethod       @map("payment_method")
+  subtotal           Decimal             @db.Decimal(18, 2)
+  tax                Decimal             @db.Decimal(18, 2)
+  discount           Decimal             @default(0) @db.Decimal(18, 2)
+  total              Decimal             @db.Decimal(18, 2)
+  receivedAmount     Decimal?            @map("received_amount") @db.Decimal(18, 2)
+  changeAmount       Decimal?            @map("change_amount") @db.Decimal(18, 2)
+  voidedAt           DateTime?           @map("voided_at") @db.Timestamptz(3)
+  voidedById         String?             @map("voided_by_id") @db.Uuid
+  voidReason         String?             @map("void_reason")
+  idempotencyKey     String              @map("idempotency_key")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  establishment      Establishment       @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  branch             Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  cashSession        CashSession         @relation(fields: [cashSessionId], references: [id], onDelete: Restrict)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  voidedBy           User?               @relation("SaleVoidedBy", fields: [voidedById], references: [id], onDelete: Restrict)
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items              SaleItem[]
+  electronicDocument ElectronicDocument?
+  returns            SaleReturn[]
+  receivable         AccountReceivable?
+
+  @@unique([establishmentId, idempotencyKey])
+  @@index([establishmentId, branchId, createdAt(sort: Desc)])
+  @@map("sales")
+}
+
+model SaleItem {
+  id          String               @id @default(uuid()) @db.Uuid
+  saleId      String               @map("sale_id") @db.Uuid
+  productId   String               @map("product_id") @db.Uuid
+  quantity    Decimal              @db.Decimal(18, 6)
+  unitPrice   Decimal              @map("unit_price") @db.Decimal(18, 2)
+  taxRate     Decimal              @map("tax_rate") @db.Decimal(7, 4)
+  subtotal    Decimal              @db.Decimal(18, 2)
+  tax         Decimal              @db.Decimal(18, 2)
+  total       Decimal              @db.Decimal(18, 2)
+  sale        Sale                 @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product     Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  allocations SaleItemAllocation[]
+  returnItems SaleReturnItem[]
+
+  @@index([saleId])
+  @@map("sale_items")
+}
+
+model SaleItemAllocation {
+  saleItemId        String                 @map("sale_item_id") @db.Uuid
+  batchId           String                 @map("batch_id") @db.Uuid
+  quantity          Decimal                @db.Decimal(18, 6)
+  unitCost          Decimal                @map("unit_cost") @db.Decimal(18, 6)
+  saleItem          SaleItem               @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  batch             InventoryBatch         @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  returnAllocations SaleReturnAllocation[]
+
+  @@id([saleItemId, batchId])
+  @@map("sale_item_allocations")
+}
+
+model PurchaseOrder {
+  id              String              @id @default(uuid()) @db.Uuid
+  establishmentId String              @map("establishment_id") @db.Uuid
+  branchId        String              @map("branch_id") @db.Uuid
+  supplierId      String              @map("supplier_id") @db.Uuid
+  createdById     String              @map("created_by_id") @db.Uuid
+  approvedById    String?             @map("approved_by_id") @db.Uuid
+  number          BigInt              @default(autoincrement())
+  status          PurchaseOrderStatus @default(DRAFT)
+  expectedAt      DateTime?           @map("expected_at") @db.Date
+  notes           String?
+  subtotal        Decimal             @db.Decimal(18, 2)
+  tax             Decimal             @db.Decimal(18, 2)
+  total           Decimal             @db.Decimal(18, 2)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  approvedAt      DateTime?           @map("approved_at") @db.Timestamptz(3)
+  establishment   Establishment       @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  branch          Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  supplier        Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  createdBy       User                @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy      User?               @relation("PurchaseOrderApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  items           PurchaseOrderItem[]
+  payables        AccountPayable[]
+
+  @@index([establishmentId, status, createdAt(sort: Desc)])
+  @@map("purchase_orders")
+}
+
+model AccountReceivable {
+  id              String              @id @default(uuid()) @db.Uuid
+  establishmentId String              @map("establishment_id") @db.Uuid
+  customerId      String              @map("customer_id") @db.Uuid
+  saleId          String              @unique @map("sale_id") @db.Uuid
+  originalAmount  Decimal             @map("original_amount") @db.Decimal(18, 2)
+  balance         Decimal             @db.Decimal(18, 2)
+  dueDate         DateTime            @map("due_date") @db.Date
+  status          PortfolioStatus     @default(OPEN)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  establishment   Establishment       @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  customer        Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  sale            Sale                @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  payments        ReceivablePayment[]
+
+  @@index([establishmentId, status, dueDate])
+  @@map("accounts_receivable")
+}
+
+model ReceivablePayment {
+  id                  String            @id @default(uuid()) @db.Uuid
+  establishmentId     String            @map("establishment_id") @db.Uuid
+  accountReceivableId String            @map("account_receivable_id") @db.Uuid
+  amount              Decimal           @db.Decimal(18, 2)
+  method              PaymentMethod
+  reference           String?
+  idempotencyKey      String            @map("idempotency_key")
+  paidAt              DateTime          @default(now()) @map("paid_at") @db.Timestamptz(3)
+  establishment       Establishment     @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  accountReceivable   AccountReceivable @relation(fields: [accountReceivableId], references: [id], onDelete: Restrict)
+
+  @@unique([establishmentId, idempotencyKey])
+  @@index([accountReceivableId, paidAt])
+  @@map("receivable_payments")
+}
+
+model AccountPayable {
+  id              String           @id @default(uuid()) @db.Uuid
+  establishmentId String           @map("establishment_id") @db.Uuid
+  supplierId      String           @map("supplier_id") @db.Uuid
+  purchaseOrderId String           @map("purchase_order_id") @db.Uuid
+  sourceKey       String           @map("source_key")
+  originalAmount  Decimal          @map("original_amount") @db.Decimal(18, 2)
+  balance         Decimal          @db.Decimal(18, 2)
+  dueDate         DateTime         @map("due_date") @db.Date
+  status          PortfolioStatus  @default(OPEN)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  establishment   Establishment    @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  supplier        Supplier         @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  purchaseOrder   PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  payments        PayablePayment[]
+
+  @@unique([establishmentId, sourceKey])
+  @@index([establishmentId, status, dueDate])
+  @@map("accounts_payable")
+}
+
+model PayablePayment {
+  id               String         @id @default(uuid()) @db.Uuid
+  establishmentId  String         @map("establishment_id") @db.Uuid
+  accountPayableId String         @map("account_payable_id") @db.Uuid
+  amount           Decimal        @db.Decimal(18, 2)
+  method           PaymentMethod
+  reference        String?
+  idempotencyKey   String         @map("idempotency_key")
+  paidAt           DateTime       @default(now()) @map("paid_at") @db.Timestamptz(3)
+  establishment    Establishment  @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  accountPayable   AccountPayable @relation(fields: [accountPayableId], references: [id], onDelete: Restrict)
+
+  @@unique([establishmentId, idempotencyKey])
+  @@index([accountPayableId, paidAt])
+  @@map("payable_payments")
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(uuid()) @db.Uuid
+  purchaseOrderId  String        @map("purchase_order_id") @db.Uuid
+  productId        String        @map("product_id") @db.Uuid
+  orderedQuantity  Decimal       @map("ordered_quantity") @db.Decimal(18, 6)
+  receivedQuantity Decimal       @default(0) @map("received_quantity") @db.Decimal(18, 6)
+  unitCost         Decimal       @map("unit_cost") @db.Decimal(18, 6)
+  taxRate          Decimal       @default(0) @map("tax_rate") @db.Decimal(7, 4)
+  subtotal         Decimal       @db.Decimal(18, 2)
+  tax              Decimal       @db.Decimal(18, 2)
+  total            Decimal       @db.Decimal(18, 2)
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([purchaseOrderId, productId])
+  @@map("purchase_order_items")
+}
+
+model InventoryTransfer {
+  id                  String                  @id @default(uuid()) @db.Uuid
+  establishmentId     String                  @map("establishment_id") @db.Uuid
+  originBranchId      String                  @map("origin_branch_id") @db.Uuid
+  destinationBranchId String                  @map("destination_branch_id") @db.Uuid
+  createdById         String                  @map("created_by_id") @db.Uuid
+  shippedById         String?                 @map("shipped_by_id") @db.Uuid
+  receivedById        String?                 @map("received_by_id") @db.Uuid
+  number              BigInt                  @default(autoincrement())
+  status              InventoryTransferStatus @default(DRAFT)
+  notes               String?
+  createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  shippedAt           DateTime?               @map("shipped_at") @db.Timestamptz(3)
+  receivedAt          DateTime?               @map("received_at") @db.Timestamptz(3)
+  establishment       Establishment           @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  originBranch        Branch                  @relation("TransferOrigin", fields: [originBranchId], references: [id], onDelete: Restrict)
+  destinationBranch   Branch                  @relation("TransferDestination", fields: [destinationBranchId], references: [id], onDelete: Restrict)
+  createdBy           User                    @relation("TransferCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  shippedBy           User?                   @relation("TransferShippedBy", fields: [shippedById], references: [id], onDelete: Restrict)
+  receivedBy          User?                   @relation("TransferReceivedBy", fields: [receivedById], references: [id], onDelete: Restrict)
+  items               InventoryTransferItem[]
+
+  @@index([establishmentId, status, createdAt(sort: Desc)])
+  @@map("inventory_transfers")
+}
+
+model InventoryTransferItem {
+  id            String            @id @default(uuid()) @db.Uuid
+  transferId    String            @map("transfer_id") @db.Uuid
+  productId     String            @map("product_id") @db.Uuid
+  sourceBatchId String            @map("source_batch_id") @db.Uuid
+  quantity      Decimal           @db.Decimal(18, 6)
+  transfer      InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product       Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sourceBatch   InventoryBatch    @relation(fields: [sourceBatchId], references: [id], onDelete: Restrict)
+
+  @@unique([transferId, sourceBatchId])
+  @@map("inventory_transfer_items")
+}
+
+model InventoryCount {
+  id              String               @id @default(uuid()) @db.Uuid
+  establishmentId String               @map("establishment_id") @db.Uuid
+  branchId        String               @map("branch_id") @db.Uuid
+  createdById     String               @map("created_by_id") @db.Uuid
+  approvedById    String?              @map("approved_by_id") @db.Uuid
+  appliedById     String?              @map("applied_by_id") @db.Uuid
+  number          BigInt               @default(autoincrement())
+  status          InventoryCountStatus @default(DRAFT)
+  reason          String
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  submittedAt     DateTime?            @map("submitted_at") @db.Timestamptz(3)
+  approvedAt      DateTime?            @map("approved_at") @db.Timestamptz(3)
+  appliedAt       DateTime?            @map("applied_at") @db.Timestamptz(3)
+  establishment   Establishment        @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  branch          Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdBy       User                 @relation("InventoryCountCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy      User?                @relation("InventoryCountApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  appliedBy       User?                @relation("InventoryCountAppliedBy", fields: [appliedById], references: [id], onDelete: Restrict)
+  items           InventoryCountItem[]
+
+  @@index([establishmentId, status, createdAt(sort: Desc)])
+  @@map("inventory_counts")
+}
+
+model InventoryCountItem {
+  id               String         @id @default(uuid()) @db.Uuid
+  inventoryCountId String         @map("inventory_count_id") @db.Uuid
+  batchId          String         @map("batch_id") @db.Uuid
+  expectedQuantity Decimal        @map("expected_quantity") @db.Decimal(18, 6)
+  countedQuantity  Decimal        @map("counted_quantity") @db.Decimal(18, 6)
+  inventoryCount   InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
+  batch            InventoryBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([inventoryCountId, batchId])
+  @@map("inventory_count_items")
+}
+
+model SaleReturn {
+  id              String           @id @default(uuid()) @db.Uuid
+  establishmentId String           @map("establishment_id") @db.Uuid
+  saleId          String           @map("sale_id") @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  number          BigInt           @default(autoincrement())
+  reason          String
+  total           Decimal          @db.Decimal(18, 2)
+  idempotencyKey  String           @map("idempotency_key")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  establishment   Establishment    @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  sale            Sale             @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items           SaleReturnItem[]
+
+  @@unique([establishmentId, idempotencyKey])
+  @@index([saleId, createdAt(sort: Desc)])
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id           String                 @id @default(uuid()) @db.Uuid
+  saleReturnId String                 @map("sale_return_id") @db.Uuid
+  saleItemId   String                 @map("sale_item_id") @db.Uuid
+  quantity     Decimal                @db.Decimal(18, 6)
+  amount       Decimal                @db.Decimal(18, 2)
+  saleReturn   SaleReturn             @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItem     SaleItem               @relation(fields: [saleItemId], references: [id], onDelete: Restrict)
+  allocations  SaleReturnAllocation[]
+
+  @@map("sale_return_items")
+}
+
+model SaleReturnAllocation {
+  saleReturnItemId   String             @map("sale_return_item_id") @db.Uuid
+  saleItemId         String             @map("sale_item_id") @db.Uuid
+  batchId            String             @map("batch_id") @db.Uuid
+  quantity           Decimal            @db.Decimal(18, 6)
+  saleReturnItem     SaleReturnItem     @relation(fields: [saleReturnItemId], references: [id], onDelete: Cascade)
+  originalAllocation SaleItemAllocation @relation(fields: [saleItemId, batchId], references: [saleItemId, batchId], onDelete: Restrict)
+
+  @@id([saleReturnItemId, batchId])
+  @@map("sale_return_allocations")
+}
+
+model Account {
+  id              String        @id @default(uuid()) @db.Uuid
+  establishmentId String        @map("establishment_id") @db.Uuid
+  parentId        String?       @map("parent_id") @db.Uuid
+  code            String
+  name            String
+  type            AccountType
+  active          Boolean       @default(true)
+  allowEntries    Boolean       @default(true) @map("allow_entries")
+  establishment   Establishment @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  parent          Account?      @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children        Account[]     @relation("AccountHierarchy")
+  lines           JournalLine[]
+
+  @@unique([establishmentId, code])
+  @@index([establishmentId, type, active])
+  @@map("accounts")
+}
+
+model JournalEntry {
+  id              String             @id @default(uuid()) @db.Uuid
+  establishmentId String             @map("establishment_id") @db.Uuid
+  createdById     String             @map("created_by_id") @db.Uuid
+  reversalOfId    String?            @unique @map("reversal_of_id") @db.Uuid
+  number          BigInt             @default(autoincrement())
+  date            DateTime           @db.Date
+  description     String
+  referenceType   String?            @map("reference_type")
+  referenceId     String?            @map("reference_id")
+  status          JournalEntryStatus @default(DRAFT)
+  postedAt        DateTime?          @map("posted_at") @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  establishment   Establishment      @relation(fields: [establishmentId], references: [id], onDelete: Restrict)
+  createdBy       User               @relation("JournalEntryCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  reversalOf      JournalEntry?      @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal        JournalEntry?      @relation("JournalReversal")
+  lines           JournalLine[]
+
+  @@index([establishmentId, date, status])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String       @id @default(uuid()) @db.Uuid
+  journalEntryId String       @map("journal_entry_id") @db.Uuid
+  accountId      String       @map("account_id") @db.Uuid
+  description    String?
+  debit          Decimal      @default(0) @db.Decimal(18, 2)
+  credit         Decimal      @default(0) @db.Decimal(18, 2)
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId, journalEntryId])
+  @@map("journal_lines")
+}

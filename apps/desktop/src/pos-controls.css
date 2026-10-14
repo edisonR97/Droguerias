@@ -1,0 +1,41 @@
+.pos-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.secondary {
+  padding: 9px 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+.success-receipt div {
+  display: flex;
+  flex-direction: column;
+}
+.dark .secondary {
+  background: #1e293b;
+  color: #e5edf7;
+  border-color: #475569;
+}
+@media print {
+  .sidebar,
+  header,
+  .section-heading,
+  .pos-grid,
+  .cash-gate {
+    display: none !important;
+  }
+  .success-receipt {
+    margin: 0;
+    background: #fff;
+    color: #000;
+    border: 1px solid #000;
+  }
+  .success-receipt button {
+    display: none;
+  }
+}

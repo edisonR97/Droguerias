@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FarmaCore ERP",
+  "version": "0.1.0",
+  "identifier": "co.farmacore.erp",
+  "build": {
+    "beforeDevCommand": "corepack pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "corepack pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "FarmaCore ERP",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 700,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src \u0027self\u0027; connect-src \u0027self\u0027 http://127.0.0.1:4310; img-src \u0027self\u0027 data:; style-src \u0027self\u0027 \u0027unsafe-inline\u0027"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "windows": {
+      "wix": {
+        "language": "es-ES"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "useLocalToolsDir": true
+  }
+}

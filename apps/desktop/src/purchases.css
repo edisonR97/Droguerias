@@ -1,0 +1,31 @@
+.purchase-form {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 2fr 0.7fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+.purchase-form label {
+  font-size: 12px;
+  font-weight: 700;
+}
+.purchase-form input,
+.purchase-form select {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.dark .purchase-form input,
+.dark .purchase-form select {
+  border-color: #475569;
+}
+@media (max-width: 1100px) {
+  .purchase-form {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

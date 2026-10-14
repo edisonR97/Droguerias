@@ -1,0 +1,55 @@
+{
+  "name": "farmacore-erp",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": "\u003e=22"
+  },
+  "pnpm": {
+    "overrides": {
+      "deepmerge-ts": "^8.0.0",
+      "js-yaml": "^5.4.1"
+    }
+  },
+  "scripts": {
+    "build": "corepack pnpm -r --if-present build",
+    "dev": "turbo dev",
+    "lint": "corepack pnpm -r --if-present lint",
+    "typecheck": "corepack pnpm -r --if-present typecheck",
+    "test": "corepack pnpm -r --if-present test",
+    "format:check": "prettier --check .",
+    "db:generate": "corepack pnpm --filter @farmacore/local-api prisma:generate",
+    "db:migrate": "corepack pnpm --filter @farmacore/local-api prisma:migrate",
+    "db:seed": "corepack pnpm --filter @farmacore/local-api prisma:seed",
+    "start:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local.ps1",
+    "build:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1",
+    "installer:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
+    "installer:sign": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sign-installer.ps1",
+    "installer:silent": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-silent.ps1",
+    "release:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-windows.ps1",
+    "release:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release-readiness-check.ps1",
+    "service:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-windows-service.ps1",
+    "service:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-status.ps1",
+    "service:remove": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/remove-windows-service.ps1",
+    "backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup-database.ps1",
+    "backup:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-backup.ps1",
+    "health:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-health.ps1",
+    "e2e:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-e2e.ps1",
+    "license:keys": "node scripts/generate-license-keys.mjs",
+    "license:issue": "node scripts/issue-license.mjs",
+    "production:up": "docker compose --env-file .env -f infra/docker/docker-compose.production.yml up -d --build --wait",
+    "production:down": "docker compose --env-file .env -f infra/docker/docker-compose.production.yml down",
+    "production:status": "docker compose --env-file .env -f infra/docker/docker-compose.production.yml ps",
+    "production:logs": "docker compose --env-file .env -f infra/docker/docker-compose.production.yml logs --tail=200"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "eslint": "^9.37.0",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.1"
+  }
+}
